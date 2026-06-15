@@ -252,6 +252,10 @@ const awsSdkOptions: plugins.aws_sdk = {
   }
 };
 
+const awsSdkServiceFunctionOptions: plugins.aws_sdk = {
+  service: params => params.TableName ?? 'aws',
+};
+
 const redisOptions: plugins.redis = {
   service: 'test',
   allowlist: ['info', /auth/i, command => true],
@@ -288,6 +292,7 @@ tracer.use('anthropic');
 tracer.use('avsc');
 tracer.use('aws-sdk');
 tracer.use('aws-sdk', awsSdkOptions);
+tracer.use('aws-sdk', awsSdkServiceFunctionOptions);
 tracer.use('azure-cosmos');
 tracer.use('azure-event-hubs')
 tracer.use('azure-functions');
