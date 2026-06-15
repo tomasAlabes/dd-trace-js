@@ -167,8 +167,7 @@ function loadConfigurationsTable () {
 /**
  * Parses and transforms a raw environment value with the same parser and
  * transformer Config applies when it reads environment sources, so callers
- * receive the typed value instead of the raw string. Names without a
- * configuration entry (any non DD_/OTEL_ variable) are returned unparsed.
+ * receive the typed value instead of the raw string.
  *
  * @param {string} name Canonical or alias environment variable name.
  * @param {string} value Raw value read from an environment source.
@@ -179,17 +178,13 @@ function parseConfigurationValue (name, value, source) {
   loadConfigurationsTable()
   const canonical = aliasToCanonical[name] ?? name
   const entry = configurationsTable[canonical]
-  if (entry === undefined) {
-    return value
-  }
   const parsed = entry.parser(value, canonical, source)
   return parsed !== undefined && entry.transformer ? entry.transformer(parsed, canonical, source) : parsed
 }
 
 /**
  * Returns the registered default for a configuration — the same value Config
- * resolves when no environment source sets it. Names without a configuration
- * entry (any non DD_/OTEL_ variable) have no default and return `undefined`.
+ * resolves when no environment source sets it.
  *
  * @param {string} name Canonical or alias environment variable name.
  * @returns {string | number | boolean | object | undefined}
@@ -198,13 +193,81 @@ function getRegisteredDefault (name) {
   loadConfigurationsTable()
   const canonical = aliasToCanonical[name] ?? name
   const entry = configurationsTable[canonical]
-  if (entry === undefined) {
-    return
-  }
   return configDefaults[entry.property ?? canonical]
 }
 
+/** @typedef {import('./generated-config-types').GeneratedEnvVarConfig} GeneratedEnvVarConfig */
+
+/**
+ * Returns the value stored at the given name, assumed to be in environment variable format,
+ * from the supported env sources (process.env, local stable config, fleet stable config).
+ * Falls back to aliases if the canonical name is not set.
+ *
+ * The raw value is parsed and transformed exactly as Config does when it reads environment
+ * sources, so the returned value is typed (boolean, number, array, map, ...) rather than the
+ * raw string. A literal supported name resolves to its specific configured type.
+ *
+ * When the name is not set in any source, the registered default is returned, so callers can
+ * use the value directly. Callers that must distinguish an explicitly configured value from the
+ * default (e.g. an OTel fallback that only applies when the option is unset) pass `skipDefault`
+ * to receive `undefined` for an unset value instead. All sources (process.env, local and fleet
+ * stable config) are read in both modes.
+ *
+ * @template {keyof GeneratedEnvVarConfig} TName
+ * @overload
+ * @param {TName} name Environment variable name
+ * @returns {GeneratedEnvVarConfig[TName]}
+ */
+/**
+ * @template {keyof GeneratedEnvVarConfig} TName
+ * @overload
+ * @param {TName} name Environment variable name
+ * @param {boolean} skipDefault Return `undefined` instead of the registered default when unset.
+ * @returns {GeneratedEnvVarConfig[TName] | undefined}
+ */
+/**
+ * @overload
+ * @param {string} name Environment variable name
+ * @param {boolean} [skipDefault] Return `undefined` instead of the registered default when unset.
+ * @returns {string | number | boolean | object | undefined}
+ */
+/**
+ * @param {string} name
+ * @param {boolean} [skipDefault]
+ * @throws {Error} if the configuration is not supported
+ */
+function getValueFromEnvSources (name, skipDefault) {
+  validateAccess(name)
+
+  if (!stableConfigLoaded) {
+    loadStableConfig()
+  }
+
+  if (fleetStableConfig !== undefined) {
+    const fromFleet = getValueFromSource(name, fleetStableConfig)
+    if (fromFleet !== undefined) {
+      return parseConfigurationValue(name, fromFleet, 'fleet_stable_config')
+    }
+  }
+
+  const fromEnv = getValueFromSource(name, process.env)
+  if (fromEnv !== undefined) {
+    return parseConfigurationValue(name, fromEnv, 'env_var')
+  }
+
+  if (localStableConfig !== undefined) {
+    const fromLocal = getValueFromSource(name, localStableConfig)
+    if (fromLocal !== undefined) {
+      return parseConfigurationValue(name, fromLocal, 'local_stable_config')
+    }
+  }
+
+  return skipDefault ? undefined : getRegisteredDefault(name)
+}
+
 module.exports = {
+  getValueFromEnvSources,
+
   /**
    * Expose raw stable config maps and warnings for consumers that need
    * per-source access (e.g. telemetry in Config).
@@ -262,55 +325,6 @@ module.exports = {
   getEnvironmentVariable (name) {
     validateAccess(name)
     return getValueFromSource(name, process.env)
-  },
-
-  /**
-   * Returns the value stored at the given name, assumed to be in environment variable format,
-   * from the supported env sources (process.env, local stable config, fleet stable config).
-   * Falls back to aliases if the canonical name is not set.
-   *
-   * The raw value is parsed and transformed exactly as Config does when it reads environment
-   * sources, so the returned value is typed (boolean, number, array, map, ...) rather than the
-   * raw string. Non DD_/OTEL_ variables have no configuration entry and are returned unparsed.
-   *
-   * When the name is not set in any source, the registered default is returned, so callers can
-   * use the value directly. Callers that must distinguish an explicitly configured value from the
-   * default (e.g. an OTel fallback that only applies when the option is unset) pass `skipDefault`
-   * to receive `undefined` for an unset value instead. All sources (process.env, local and fleet
-   * stable config) are read in both modes.
-   *
-   * @param {string} name Environment variable name
-   * @param {boolean} [skipDefault] Return `undefined` instead of the registered default when unset.
-   * @returns {string | number | boolean | object | undefined}
-   * @throws {Error} if the configuration is not supported
-   */
-  getValueFromEnvSources (name, skipDefault) {
-    validateAccess(name)
-
-    if (!stableConfigLoaded) {
-      loadStableConfig()
-    }
-
-    if (fleetStableConfig !== undefined) {
-      const fromFleet = getValueFromSource(name, fleetStableConfig)
-      if (fromFleet !== undefined) {
-        return parseConfigurationValue(name, fromFleet, 'fleet_stable_config')
-      }
-    }
-
-    const fromEnv = getValueFromSource(name, process.env)
-    if (fromEnv !== undefined) {
-      return parseConfigurationValue(name, fromEnv, 'env_var')
-    }
-
-    if (localStableConfig !== undefined) {
-      const fromLocal = getValueFromSource(name, localStableConfig)
-      if (fromLocal !== undefined) {
-        return parseConfigurationValue(name, fromLocal, 'local_stable_config')
-      }
-    }
-
-    return skipDefault ? undefined : getRegisteredDefault(name)
   },
 
   /**

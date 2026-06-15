@@ -157,10 +157,10 @@ describe('config-helper env resolution', () => {
     assert.strictEqual(getValueFromEnvSources('DD_TRACE_ENABLED', true), false)
   })
 
-  it('returns undefined for an unset variable without a configuration entry', () => {
+  it('throws for an unset variable without a configuration entry', () => {
     delete process.env.SOME_UNREGISTERED_VAR
 
-    assert.strictEqual(getValueFromEnvSources('SOME_UNREGISTERED_VAR'), undefined)
+    assert.throws(() => getValueFromEnvSources('SOME_UNREGISTERED_VAR'))
   })
 
   it('prefers canonical name over alias', () => {
@@ -203,12 +203,10 @@ describe('config-helper env resolution', () => {
     )
   })
 
-  it('returns value for non-DD/OTEL environment variables', () => {
+  it('throws for a non-DD/OTEL environment variable without a configuration entry', () => {
     process.env.NODE_ENV = 'production'
 
-    const value = getValueFromEnvSources('NODE_ENV')
-
-    assert.strictEqual(value, 'production')
+    assert.throws(() => getValueFromEnvSources('NODE_ENV'))
   })
 
   it('parses boolean configuration values', () => {

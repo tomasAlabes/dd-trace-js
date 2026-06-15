@@ -7,11 +7,6 @@ const { traceChannel, debugChannel, infoChannel, warnChannel, errorChannel } = r
 const logWriter = require('./writer')
 const { Log, LogConfig, NoTransmitError } = require('./log')
 
-const config = {
-  enabled: undefined,
-  logLevel: undefined,
-}
-
 // In most places where we know we want to mute a log we use log.error() directly
 const NO_TRANSMIT = new LogConfig(false)
 
@@ -79,14 +74,11 @@ const log = {
     const logger = options.logger
     const logLevel = options.logLevel ??
         getValueFromEnvSources('DD_TRACE_LOG_LEVEL', true) ??
-        config.logLevel ??
         defaults?.logLevel
     const enabled = getValueFromEnvSources('DD_TRACE_DEBUG', true) ??
       // TODO: Handle this by adding a log buffer so that configure may be called with the actual configurations.
       // eslint-disable-next-line eslint-rules/eslint-process-env
-      (process.env.OTEL_LOG_LEVEL === 'debug' || (config.enabled ?? defaults?.DD_TRACE_DEBUG))
-    config.logLevel = logLevel
-    config.enabled = enabled
+      (process.env.OTEL_LOG_LEVEL === 'debug' || defaults?.DD_TRACE_DEBUG)
     logWriter.configure(enabled, logLevel, logger)
 
     return enabled
