@@ -30,6 +30,10 @@ if (process.env.CUSTOM_SEQUENCER) {
   }
 }
 
+if (process.env.NO_ISOLATE) {
+  config.test.isolate = false
+}
+
 if (process.env.COVERAGE_PROVIDER) {
   config.test.coverage = {
     provider: process.env.COVERAGE_PROVIDER || 'v8',

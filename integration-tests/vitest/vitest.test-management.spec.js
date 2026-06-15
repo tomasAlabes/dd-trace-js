@@ -113,7 +113,7 @@ versions.forEach((version) => {
             env: {
               ...getCiVisAgentlessConfig(receiver.port),
               TEST_DIR: 'ci-visibility/vitest-tests/early-flake-detection*',
-              NODE_OPTIONS: '--import dd-trace/register.js -r dd-trace/ci/init',
+              NODE_OPTIONS: '--import dd-trace/ci/register -r dd-trace/ci/init',
             },
           }
         )
@@ -145,7 +145,7 @@ versions.forEach((version) => {
           env: {
             ...getCiVisAgentlessConfig(receiver.port),
             TEST_DIR: 'ci-visibility/vitest-tests/early-flake-detection*',
-            NODE_OPTIONS: '--import dd-trace/register.js -r dd-trace/ci/init',
+            NODE_OPTIONS: '--import dd-trace/ci/register -r dd-trace/ci/init',
             DD_SERVICE: 'my-service',
           },
         }
@@ -306,7 +306,7 @@ versions.forEach((version) => {
                 env: {
                   ...getCiVisAgentlessConfig(receiver.port),
                   TEST_DIR: 'ci-visibility/vitest-tests/test-attempt-to-fix*',
-                  NODE_OPTIONS: '--import dd-trace/register.js -r dd-trace/ci/init --no-warnings',
+                  NODE_OPTIONS: '--import dd-trace/ci/register -r dd-trace/ci/init --no-warnings',
                   ...extraEnvVars,
                   ...(shouldAlwaysPass ? { SHOULD_ALWAYS_PASS: '1' } : {}),
                   ...(shouldFailSometimes ? { SHOULD_FAIL_SOMETIMES: '1' } : {}),
@@ -454,7 +454,7 @@ versions.forEach((version) => {
                 env: {
                   ...getCiVisAgentlessConfig(receiver.port),
                   TEST_DIR: 'ci-visibility/vitest-tests/hooks-attempt-to-fix-failing-after-each.mjs',
-                  NODE_OPTIONS: '--import dd-trace/register.js -r dd-trace/ci/init --no-warnings',
+                  NODE_OPTIONS: '--import dd-trace/ci/register -r dd-trace/ci/init --no-warnings',
                 },
               }
             )
@@ -554,7 +554,7 @@ versions.forEach((version) => {
                 env: {
                   ...getCiVisAgentlessConfig(receiver.port),
                   TEST_DIR: 'ci-visibility/vitest-tests/test-attempt-to-fix*',
-                  NODE_OPTIONS: '--import dd-trace/register.js -r dd-trace/ci/init --no-warnings',
+                  NODE_OPTIONS: '--import dd-trace/ci/register -r dd-trace/ci/init --no-warnings',
                 },
               }
             )
@@ -702,7 +702,7 @@ versions.forEach((version) => {
                 env: {
                   ...getCiVisAgentlessConfig(receiver.port),
                   TEST_DIR: 'ci-visibility/vitest-tests/test-disabled*',
-                  NODE_OPTIONS: '--import dd-trace/register.js -r dd-trace/ci/init --no-warnings',
+                  NODE_OPTIONS: '--import dd-trace/ci/register -r dd-trace/ci/init --no-warnings',
                   ...extraEnvVars,
                 },
               }
@@ -813,7 +813,7 @@ versions.forEach((version) => {
                 env: {
                   ...getCiVisAgentlessConfig(receiver.port),
                   TEST_DIR: 'ci-visibility/vitest-tests/test-quarantine*',
-                  NODE_OPTIONS: '--import dd-trace/register.js -r dd-trace/ci/init --no-warnings',
+                  NODE_OPTIONS: '--import dd-trace/ci/register -r dd-trace/ci/init --no-warnings',
                   ...extraEnvVars,
                 },
               }
@@ -893,7 +893,7 @@ versions.forEach((version) => {
                 env: {
                   ...getCiVisAgentlessConfig(receiver.port),
                   TEST_DIR: 'ci-visibility/vitest-tests/test-quarantine.mjs',
-                  NODE_OPTIONS: '--import dd-trace/register.js -r dd-trace/ci/init --no-warnings',
+                  NODE_OPTIONS: '--import dd-trace/ci/register -r dd-trace/ci/init --no-warnings',
                 },
               }
             )
@@ -978,7 +978,7 @@ versions.forEach((version) => {
                 env: {
                   ...getCiVisAgentlessConfig(receiver.port),
                   TEST_DIR: 'ci-visibility/vitest-tests/quarantine-eventually-passes.mjs',
-                  NODE_OPTIONS: '--import dd-trace/register.js -r dd-trace/ci/init --no-warnings',
+                  NODE_OPTIONS: '--import dd-trace/ci/register -r dd-trace/ci/init --no-warnings',
                 },
               }
             )
@@ -1039,7 +1039,7 @@ versions.forEach((version) => {
               env: {
                 ...getCiVisAgentlessConfig(receiver.port),
                 TEST_DIR: 'ci-visibility/vitest-tests/test-attempt-to-fix*',
-                NODE_OPTIONS: '--import dd-trace/register.js -r dd-trace/ci/init --no-warnings',
+                NODE_OPTIONS: '--import dd-trace/ci/register -r dd-trace/ci/init --no-warnings',
                 DD_TRACE_DEBUG: '1',
               },
             }

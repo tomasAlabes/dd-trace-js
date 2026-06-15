@@ -111,7 +111,7 @@ versions.forEach((version) => {
               ...getCiVisAgentlessConfig(receiver.port),
               // Creates a span after ci/init but before library configuration adds capability metadata.
               NODE_OPTIONS:
-                '--import dd-trace/register.js -r dd-trace/ci/init -r ./ci-visibility/vitest-early-span',
+                '--import dd-trace/ci/register -r dd-trace/ci/init -r ./ci-visibility/vitest-early-span',
               DD_TEST_SESSION_NAME: 'my-test-session-name',
             },
           }
@@ -240,7 +240,7 @@ versions.forEach((version) => {
             env: {
               ...getCiVisAgentlessConfig(receiver.port),
               TEST_DIR: 'ci-visibility/vitest-tests/impacted-test*',
-              NODE_OPTIONS: '--import dd-trace/register.js -r dd-trace/ci/init --no-warnings',
+              NODE_OPTIONS: '--import dd-trace/ci/register -r dd-trace/ci/init --no-warnings',
               GITHUB_BASE_REF: '',
               ...extraEnvVars,
             },
@@ -345,7 +345,7 @@ versions.forEach((version) => {
             cwd: `${cwd}/ci-visibility/vitest-tests-programmatic-api`,
             env: {
               ...getCiVisAgentlessConfig(receiver.port),
-              NODE_OPTIONS: '--import dd-trace/register.js -r dd-trace/ci/init',
+              NODE_OPTIONS: '--import dd-trace/ci/register -r dd-trace/ci/init',
               TEST_DIR: './test-programmatic-api*',
             },
           }
@@ -400,7 +400,7 @@ versions.forEach((version) => {
               cwd,
               env: {
                 ...getCiVisAgentlessConfig(receiver.port),
-                NODE_OPTIONS: '--import dd-trace/register.js -r dd-trace/ci/init',
+                NODE_OPTIONS: '--import dd-trace/ci/register -r dd-trace/ci/init',
                 COVERAGE_PROVIDER: 'v8',
                 TEST_DIR: 'ci-visibility/vitest-tests/coverage-test.mjs',
                 DD_GIT_COMMIT_SHA: gitCommitSha,
@@ -438,7 +438,7 @@ versions.forEach((version) => {
               cwd,
               env: {
                 ...getCiVisEvpProxyConfig(receiver.port),
-                NODE_OPTIONS: '--import dd-trace/register.js -r dd-trace/ci/init',
+                NODE_OPTIONS: '--import dd-trace/ci/register -r dd-trace/ci/init',
                 DD_INSTRUMENTATION_TELEMETRY_ENABLED: 'true',
                 COVERAGE_PROVIDER: 'v8',
                 TEST_DIR: 'ci-visibility/vitest-tests/coverage-test.mjs',
@@ -470,7 +470,7 @@ versions.forEach((version) => {
               cwd,
               env: {
                 ...getCiVisAgentlessConfig(receiver.port),
-                NODE_OPTIONS: '--import dd-trace/register.js -r dd-trace/ci/init',
+                NODE_OPTIONS: '--import dd-trace/ci/register -r dd-trace/ci/init',
                 COVERAGE_PROVIDER: 'v8',
                 TEST_DIR: 'ci-visibility/vitest-tests/coverage-test.mjs',
                 DD_GIT_COMMIT_SHA: gitCommitSha,
@@ -519,7 +519,7 @@ versions.forEach((version) => {
               // Runs test-visibility-passed-suite (pass/skip), test-visibility-failed-suite
               // (fail/pass with hooks), and test-visibility-failed-hooks (fail due to hook throws)
               TEST_DIR: 'ci-visibility/vitest-tests/test-visibility*',
-              NODE_OPTIONS: '--import dd-trace/register.js -r dd-trace/ci/init',
+              NODE_OPTIONS: '--import dd-trace/ci/register -r dd-trace/ci/init',
             },
           }
         )
@@ -584,7 +584,7 @@ versions.forEach((version) => {
               env: {
                 ...getCiVisAgentlessConfig(receiver.port),
                 TEST_DIR: 'ci-visibility/vitest-tests/{flaky-test-retries,hooks-flaky-test-retries}.mjs',
-                NODE_OPTIONS: '--import dd-trace/register.js -r dd-trace/ci/init',
+                NODE_OPTIONS: '--import dd-trace/ci/register -r dd-trace/ci/init',
               },
             }
           )
@@ -663,7 +663,7 @@ versions.forEach((version) => {
               env: {
                 ...getCiVisAgentlessConfig(receiver.port),
                 TEST_DIR: 'ci-visibility/vitest-tests/{early-flake-detection,hooks-flaky-test-retries}.mjs',
-                NODE_OPTIONS: '--import dd-trace/register.js -r dd-trace/ci/init',
+                NODE_OPTIONS: '--import dd-trace/ci/register -r dd-trace/ci/init',
               },
             }
           )
@@ -754,7 +754,7 @@ versions.forEach((version) => {
               env: {
                 ...getCiVisAgentlessConfig(receiver.port),
                 TEST_DIR: 'ci-visibility/vitest-tests/{flaky-test-retries,hooks-flaky-test-retries}.mjs',
-                NODE_OPTIONS: '--import dd-trace/register.js -r dd-trace/ci/init',
+                NODE_OPTIONS: '--import dd-trace/ci/register -r dd-trace/ci/init',
               },
             }
           )
@@ -815,7 +815,7 @@ versions.forEach((version) => {
               env: {
                 ...getCiVisAgentlessConfig(receiver.port),
                 TEST_DIR: 'ci-visibility/vitest-tests/{test-disabled,hooks-test-management}.mjs',
-                NODE_OPTIONS: '--import dd-trace/register.js -r dd-trace/ci/init --no-warnings',
+                NODE_OPTIONS: '--import dd-trace/ci/register -r dd-trace/ci/init --no-warnings',
               },
             }
           )
@@ -921,7 +921,7 @@ versions.forEach((version) => {
                 ...getCiVisAgentlessConfig(receiver.port),
                 TEST_DIR: 'ci-visibility/vitest-tests/' +
                   '{test-quarantine,hooks-test-management,hooks-test-quarantine-failing-after-each}.mjs',
-                NODE_OPTIONS: '--import dd-trace/register.js -r dd-trace/ci/init --no-warnings',
+                NODE_OPTIONS: '--import dd-trace/ci/register -r dd-trace/ci/init --no-warnings',
               },
             }
           )

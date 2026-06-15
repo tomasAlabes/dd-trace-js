@@ -69,6 +69,7 @@ versions.forEach((version) => {
   describe(`vitest@${version}`, () => {
     let cwd, receiver, childProcess, testOutput
     const newerVitestIt = version === '1.6.0' ? it.skip : it
+    const noWorkerUnsupportedIt = process.env.DD_EXPERIMENTAL_TEST_OPT_VITEST_NO_WORKER_INIT ? it.skip : it
 
     useSandbox([
       `vitest@${version}`,
@@ -101,7 +102,7 @@ versions.forEach((version) => {
             cwd,
             env: {
               ...getCiVisAgentlessConfig(receiver.port),
-              NODE_OPTIONS: '--import dd-trace/register.js -r dd-trace/ci/init', // ESM requires more flags
+              NODE_OPTIONS: '--import dd-trace/ci/register -r dd-trace/ci/init', // ESM requires more flags
               DD_TEST_SESSION_NAME: 'my-test-session',
               POOL_CONFIG: poolConfig,
               DD_SERVICE: undefined,
@@ -301,7 +302,100 @@ versions.forEach((version) => {
       })
     })
 
-    it('propagates test span context to HTTP requests and hooks during test execution', async () => {
+    newerVitestIt('strips Datadog NODE_OPTIONS from fork workers when no-worker init is enabled', async () => {
+      const payloadsPromise = receiver.gatherPayloadsMaxTimeout(
+        ({ url }) => url === '/api/v2/citestcycle',
+        payloads => {
+          const events = payloads.flatMap(({ payload }) => payload.events)
+          const testEvent = events.find(event => event.type === 'test')
+
+          assert.ok(testEvent, `should have test event, got events: ${inspect(events.map(event => event.type))}`)
+          assert.strictEqual(testEvent.content.meta[TEST_STATUS], 'pass')
+          assert.strictEqual(testEvent.content.meta[TEST_IS_TEST_FRAMEWORK_WORKER], 'true')
+        }
+      )
+
+      childProcess = exec(
+        './node_modules/.bin/vitest run',
+        {
+          cwd,
+          env: {
+            ...getCiVisAgentlessConfig(receiver.port),
+            NODE_OPTIONS: '--no-warnings --import dd-trace/ci/register -r dd-trace/ci/init',
+            TEST_DIR: 'ci-visibility/vitest-tests/vitest-worker-env.mjs',
+            POOL_CONFIG: 'forks',
+            DD_EXPERIMENTAL_TEST_OPT_VITEST_NO_WORKER_INIT: 'true',
+            EXPECT_DD_NODE_OPTIONS_STRIPPED: '1',
+            DD_SERVICE: undefined,
+          },
+        }
+      )
+
+      childProcess.stdout.on('data', data => { testOutput += data })
+      childProcess.stderr.on('data', data => { testOutput += data })
+
+      const [[exitCode]] = await Promise.all([
+        once(childProcess, 'exit'),
+        payloadsPromise,
+      ])
+
+      assert.strictEqual(exitCode, 0, testOutput)
+    })
+
+    newerVitestIt('ignores no-worker init when isolate is disabled', async () => {
+      const payloadsPromise = receiver.gatherPayloadsMaxTimeout(
+        ({ url }) => url === '/api/v2/citestcycle',
+        payloads => {
+          const events = payloads.flatMap(({ payload }) => payload.events)
+          const testSessionEvent = events.find(event => event.type === 'test_session_end')
+          const testModuleEvent = events.find(event => event.type === 'test_module_end')
+
+          assert.ok(
+            testSessionEvent,
+            `should have test session event, got events: ${inspect(events.map(event => event.type))}`
+          )
+          assert.ok(
+            testModuleEvent,
+            `should have test module event, got events: ${inspect(events.map(event => event.type))}`
+          )
+        }
+      )
+
+      childProcess = exec(
+        './node_modules/.bin/vitest run',
+        {
+          cwd,
+          env: {
+            ...getCiVisAgentlessConfig(receiver.port),
+            NODE_OPTIONS: '--no-warnings --import dd-trace/ci/register -r dd-trace/ci/init',
+            TEST_DIR: 'ci-visibility/vitest-tests/vitest-worker-env.mjs',
+            POOL_CONFIG: 'forks',
+            NO_ISOLATE: '1',
+            DD_EXPERIMENTAL_TEST_OPT_VITEST_NO_WORKER_INIT: 'true',
+            EXPECT_DD_NODE_OPTIONS_PRESENT: '1',
+            DD_TRACE_DEBUG: 'true',
+            DD_TRACE_LOG_LEVEL: 'warn',
+            DD_SERVICE: undefined,
+          },
+        }
+      )
+
+      childProcess.stdout.on('data', data => { testOutput += data })
+      childProcess.stderr.on('data', data => { testOutput += data })
+
+      const [[exitCode]] = await Promise.all([
+        once(childProcess, 'exit'),
+        payloadsPromise,
+      ])
+
+      assert.strictEqual(exitCode, 0, testOutput)
+      assert.match(
+        testOutput,
+        /DD_EXPERIMENTAL_TEST_OPT_VITEST_NO_WORKER_INIT is ignored because Vitest isolate is disabled/
+      )
+    })
+
+    noWorkerUnsupportedIt('propagates test span context to HTTP requests and hooks during test execution', async () => {
       const eventsPromise = receiver
         .gatherPayloadsMaxTimeout(({ url }) => url === '/api/v2/citestcycle', (payloads) => {
           const events = payloads.flatMap(({ payload }) => payload.events)
@@ -365,7 +459,7 @@ versions.forEach((version) => {
           cwd,
           env: {
             ...getCiVisAgentlessConfig(receiver.port),
-            NODE_OPTIONS: '--import dd-trace/register.js -r dd-trace/ci/init',
+            NODE_OPTIONS: '--import dd-trace/ci/register -r dd-trace/ci/init',
             TEST_DIR: 'ci-visibility/vitest-tests/http-integration*',
             DD_SERVICE: undefined,
           },
@@ -402,7 +496,7 @@ versions.forEach((version) => {
             cwd,
             env: {
               ...getCiVisAgentlessConfig(receiver.port),
-              NODE_OPTIONS: '--import dd-trace/register.js -r dd-trace/ci/init',
+              NODE_OPTIONS: '--import dd-trace/ci/register -r dd-trace/ci/init',
             },
           })
           await Promise.all([eventsPromise, once(childProcess, 'exit')])
@@ -434,7 +528,7 @@ versions.forEach((version) => {
             cwd,
             env: {
               ...getCiVisAgentlessConfig(receiver.port),
-              NODE_OPTIONS: '--import dd-trace/register.js -r dd-trace/ci/init',
+              NODE_OPTIONS: '--import dd-trace/ci/register -r dd-trace/ci/init',
             },
           })
           await Promise.all([eventsPromise, once(childProcess, 'exit')])
@@ -470,7 +564,7 @@ versions.forEach((version) => {
             cwd,
             env: {
               ...getCiVisAgentlessConfig(receiver.port),
-              NODE_OPTIONS: '--import dd-trace/register.js -r dd-trace/ci/init',
+              NODE_OPTIONS: '--import dd-trace/ci/register -r dd-trace/ci/init',
             },
           })
           await Promise.all([eventsPromise, once(childProcess, 'exit')])
@@ -497,7 +591,7 @@ versions.forEach((version) => {
             ...getCiVisEvpProxyConfig(receiver.port),
             DD_TRACE_AGENT_PORT: String(receiver.port),
             DD_INSTRUMENTATION_TELEMETRY_ENABLED: 'true',
-            NODE_OPTIONS: '--import dd-trace/register.js -r dd-trace/ci/init', // ESM requires more flags
+            NODE_OPTIONS: '--import dd-trace/ci/register -r dd-trace/ci/init', // ESM requires more flags
             TEST_DIR: 'ci-visibility/vitest-tests/test-visibility-passed-suite.mjs',
           },
         }
@@ -586,7 +680,7 @@ versions.forEach((version) => {
               TEST_DIR: 'ci-visibility/vitest-tests/flaky-test-retries*',
               CUSTOM_SEQUENCER: version === '1.6.0' ? undefined : 'true',
               CUSTOM_SEQUENCER_MARKER: version === '1.6.0' ? undefined : CUSTOM_SEQUENCER_MARKER,
-              NODE_OPTIONS: '--import dd-trace/register.js -r dd-trace/ci/init', // ESM requires more flags
+              NODE_OPTIONS: '--import dd-trace/ci/register -r dd-trace/ci/init', // ESM requires more flags
             },
           }
         )
@@ -635,7 +729,7 @@ versions.forEach((version) => {
               ...getCiVisAgentlessConfig(receiver.port),
               TEST_DIR: 'ci-visibility/vitest-tests/flaky-test-retries*',
               DD_CIVISIBILITY_FLAKY_RETRY_ENABLED: 'false',
-              NODE_OPTIONS: '--import dd-trace/register.js -r dd-trace/ci/init', // ESM requires more flags
+              NODE_OPTIONS: '--import dd-trace/ci/register -r dd-trace/ci/init', // ESM requires more flags
             },
           }
         )
@@ -677,7 +771,7 @@ versions.forEach((version) => {
               ...getCiVisAgentlessConfig(receiver.port),
               TEST_DIR: 'ci-visibility/vitest-tests/flaky-test-retries*',
               DD_CIVISIBILITY_FLAKY_RETRY_COUNT: '1',
-              NODE_OPTIONS: '--import dd-trace/register.js -r dd-trace/ci/init', // ESM requires more flags
+              NODE_OPTIONS: '--import dd-trace/ci/register -r dd-trace/ci/init', // ESM requires more flags
             },
           }
         )
@@ -725,7 +819,7 @@ versions.forEach((version) => {
               ...getCiVisAgentlessConfig(receiver.port),
               TEST_DIR: 'ci-visibility/vitest-tests/flaky-test-retries*',
               DD_CIVISIBILITY_FLAKY_RETRY_COUNT: '2',
-              NODE_OPTIONS: '--import dd-trace/register.js -r dd-trace/ci/init',
+              NODE_OPTIONS: '--import dd-trace/ci/register -r dd-trace/ci/init',
             },
           }
         )
@@ -751,7 +845,7 @@ versions.forEach((version) => {
           cwd: `${cwd}/ci-visibility/subproject`,
           env: {
             ...getCiVisAgentlessConfig(receiver.port),
-            NODE_OPTIONS: '--import dd-trace/register.js -r dd-trace/ci/init',
+            NODE_OPTIONS: '--import dd-trace/ci/register -r dd-trace/ci/init',
             TEST_DIR: './vitest-test.mjs',
           },
         }
@@ -789,7 +883,7 @@ versions.forEach((version) => {
               cwd,
               env: {
                 ...getCiVisAgentlessConfig(receiver.port),
-                NODE_OPTIONS: '--import dd-trace/register.js -r dd-trace/ci/init',
+                NODE_OPTIONS: '--import dd-trace/ci/register -r dd-trace/ci/init',
                 COVERAGE_PROVIDER: coverageProvider,
                 TEST_DIR: 'ci-visibility/vitest-tests/coverage-test.mjs',
               },
@@ -836,7 +930,7 @@ versions.forEach((version) => {
             cwd,
             env: {
               ...getCiVisAgentlessConfig(receiver.port),
-              NODE_OPTIONS: '--import dd-trace/register.js -r dd-trace/ci/init',
+              NODE_OPTIONS: '--import dd-trace/ci/register -r dd-trace/ci/init',
               COVERAGE_PROVIDER: 'istanbul',
               TEST_DIR: 'ci-visibility/vitest-tests/coverage-test-zero.mjs',
             },
@@ -965,7 +1059,7 @@ versions.forEach((version) => {
             env: {
               ...getCiVisAgentlessConfig(receiver.port),
               TEST_DIR: 'ci-visibility/vitest-tests/early-flake-detection*',
-              NODE_OPTIONS: '--import dd-trace/register.js -r dd-trace/ci/init',
+              NODE_OPTIONS: '--import dd-trace/ci/register -r dd-trace/ci/init',
               SHOULD_ADD_EVENTUALLY_FAIL: '1',
               SHOULD_ADD_LAST_ATTEMPT_PASS: '1',
             },
@@ -1027,7 +1121,7 @@ versions.forEach((version) => {
             env: {
               ...getCiVisAgentlessConfig(receiver.port),
               TEST_DIR: 'ci-visibility/vitest-tests/early-flake-detection*',
-              NODE_OPTIONS: '--import dd-trace/register.js -r dd-trace/ci/init',
+              NODE_OPTIONS: '--import dd-trace/ci/register -r dd-trace/ci/init',
               SHOULD_ADD_SLOW_DURATION_TEST: '1',
             },
           }
@@ -1115,7 +1209,7 @@ versions.forEach((version) => {
             env: {
               ...getCiVisAgentlessConfig(receiver.port),
               TEST_DIR: 'ci-visibility/vitest-tests/early-flake-detection*',
-              NODE_OPTIONS: '--import dd-trace/register.js -r dd-trace/ci/init',
+              NODE_OPTIONS: '--import dd-trace/ci/register -r dd-trace/ci/init',
               SHOULD_ADD_CURRENT_ERROR_TEST: '1',
             },
           }
@@ -1171,7 +1265,7 @@ versions.forEach((version) => {
             env: {
               ...getCiVisAgentlessConfig(receiver.port),
               TEST_DIR: 'ci-visibility/vitest-tests/fails-first-then-passes.mjs',
-              NODE_OPTIONS: '--import dd-trace/register.js -r dd-trace/ci/init',
+              NODE_OPTIONS: '--import dd-trace/ci/register -r dd-trace/ci/init',
             },
           }
         )
@@ -1267,7 +1361,7 @@ versions.forEach((version) => {
             env: {
               ...getCiVisAgentlessConfig(receiver.port),
               TEST_DIR: 'ci-visibility/vitest-tests/early-flake-detection*',
-              NODE_OPTIONS: '--import dd-trace/register.js -r dd-trace/ci/init',
+              NODE_OPTIONS: '--import dd-trace/ci/register -r dd-trace/ci/init',
               ALWAYS_FAIL: 'true',
             },
           }
@@ -1325,7 +1419,7 @@ versions.forEach((version) => {
             env: {
               ...getCiVisAgentlessConfig(receiver.port),
               TEST_DIR: 'ci-visibility/vitest-tests/early-flake-detection*',
-              NODE_OPTIONS: '--import dd-trace/register.js -r dd-trace/ci/init',
+              NODE_OPTIONS: '--import dd-trace/ci/register -r dd-trace/ci/init',
             },
           }
         )
@@ -1395,7 +1489,7 @@ versions.forEach((version) => {
             env: {
               ...getCiVisAgentlessConfig(receiver.port),
               TEST_DIR: 'ci-visibility/vitest-tests/early-flake-detection*',
-              NODE_OPTIONS: '--import dd-trace/register.js -r dd-trace/ci/init',
+              NODE_OPTIONS: '--import dd-trace/ci/register -r dd-trace/ci/init',
               DD_CIVISIBILITY_EARLY_FLAKE_DETECTION_ENABLED: 'false',
             },
           }
@@ -1460,7 +1554,7 @@ versions.forEach((version) => {
             env: {
               ...getCiVisAgentlessConfig(receiver.port),
               TEST_DIR: 'ci-visibility/vitest-tests/early-flake-detection*',
-              NODE_OPTIONS: '--import dd-trace/register.js -r dd-trace/ci/init',
+              NODE_OPTIONS: '--import dd-trace/ci/register -r dd-trace/ci/init',
             },
           }
         )
@@ -1512,7 +1606,7 @@ versions.forEach((version) => {
             cwd: `${cwd}/ci-visibility/subproject`,
             env: {
               ...getCiVisAgentlessConfig(receiver.port),
-              NODE_OPTIONS: '--import dd-trace/register.js -r dd-trace/ci/init', // ESM requires more flags
+              NODE_OPTIONS: '--import dd-trace/ci/register -r dd-trace/ci/init', // ESM requires more flags
               TEST_DIR: './vitest-test.mjs',
             },
           }
@@ -1588,7 +1682,7 @@ versions.forEach((version) => {
             env: {
               ...getCiVisAgentlessConfig(receiver.port),
               TEST_DIR: 'ci-visibility/vitest-tests/early-flake-detection*',
-              NODE_OPTIONS: '--import dd-trace/register.js -r dd-trace/ci/init',
+              NODE_OPTIONS: '--import dd-trace/ci/register -r dd-trace/ci/init',
               SHOULD_REPEAT: '1',
             },
           }
@@ -1659,7 +1753,7 @@ versions.forEach((version) => {
             env: {
               ...getCiVisAgentlessConfig(receiver.port),
               TEST_DIR: 'ci-visibility/vitest-tests/early-flake-detection*',
-              NODE_OPTIONS: '--import dd-trace/register.js -r dd-trace/ci/init',
+              NODE_OPTIONS: '--import dd-trace/ci/register -r dd-trace/ci/init',
             },
           }
         )
@@ -1708,7 +1802,7 @@ versions.forEach((version) => {
             env: {
               ...getCiVisAgentlessConfig(receiver.port),
               TEST_DIR: 'ci-visibility/vitest-tests/early-flake-detection*',
-              NODE_OPTIONS: '--import dd-trace/register.js -r dd-trace/ci/init',
+              NODE_OPTIONS: '--import dd-trace/ci/register -r dd-trace/ci/init',
             },
           }
         )
@@ -1759,7 +1853,7 @@ versions.forEach((version) => {
             env: {
               ...getCiVisAgentlessConfig(receiver.port),
               TEST_DIR: 'ci-visibility/vitest-tests/dynamic-name-test*',
-              NODE_OPTIONS: '--import dd-trace/register.js -r dd-trace/ci/init',
+              NODE_OPTIONS: '--import dd-trace/ci/register -r dd-trace/ci/init',
             },
           }
         )
@@ -1815,7 +1909,7 @@ versions.forEach((version) => {
               env: {
                 ...getCiVisAgentlessConfig(receiver.port),
                 TEST_DIR: 'ci-visibility/vitest-tests/dynamic-instrumentation*',
-                NODE_OPTIONS: '--import dd-trace/register.js -r dd-trace/ci/init',
+                NODE_OPTIONS: '--import dd-trace/ci/register -r dd-trace/ci/init',
                 DD_TEST_FAILED_TEST_REPLAY_ENABLED: 'false',
               },
             }
@@ -1865,7 +1959,7 @@ versions.forEach((version) => {
               env: {
                 ...getCiVisAgentlessConfig(receiver.port),
                 TEST_DIR: 'ci-visibility/vitest-tests/dynamic-instrumentation*',
-                NODE_OPTIONS: '--import dd-trace/register.js -r dd-trace/ci/init',
+                NODE_OPTIONS: '--import dd-trace/ci/register -r dd-trace/ci/init',
               },
             }
           )
@@ -1877,7 +1971,7 @@ versions.forEach((version) => {
           })
         })
 
-        it('runs retries with dynamic instrumentation', (done) => {
+        noWorkerUnsupportedIt('runs retries with dynamic instrumentation', (done) => {
           receiver.setSettings({
             flaky_test_retries_enabled: true,
             di_enabled: true,
@@ -1950,7 +2044,7 @@ versions.forEach((version) => {
               env: {
                 ...getCiVisAgentlessConfig(receiver.port),
                 TEST_DIR: 'ci-visibility/vitest-tests/dynamic-instrumentation*',
-                NODE_OPTIONS: '--import dd-trace/register.js -r dd-trace/ci/init',
+                NODE_OPTIONS: '--import dd-trace/ci/register -r dd-trace/ci/init',
               },
             }
           )
@@ -2003,7 +2097,7 @@ versions.forEach((version) => {
               env: {
                 ...getCiVisAgentlessConfig(receiver.port),
                 TEST_DIR: 'ci-visibility/vitest-tests/breakpoint-not-hit*',
-                NODE_OPTIONS: '--import dd-trace/register.js -r dd-trace/ci/init',
+                NODE_OPTIONS: '--import dd-trace/ci/register -r dd-trace/ci/init',
               },
             }
           )
@@ -2037,7 +2131,7 @@ versions.forEach((version) => {
               env: {
                 ...getCiVisAgentlessConfig(receiver.port),
                 TEST_DIR: 'ci-visibility/vitest-tests/fake-timers-di*',
-                NODE_OPTIONS: '--import dd-trace/register.js -r dd-trace/ci/init',
+                NODE_OPTIONS: '--import dd-trace/ci/register -r dd-trace/ci/init',
               },
             }
           )

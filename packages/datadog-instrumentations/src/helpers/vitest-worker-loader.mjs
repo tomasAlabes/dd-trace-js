@@ -1,3 +1,5 @@
+import { isMainThread } from 'worker_threads'
+
 import { load as iitmLoad, resolve as iitmResolve } from 'import-in-the-middle/hook.mjs'
 
 import configHelper from '../../../dd-trace/src/config/helper.js'
@@ -33,14 +35,42 @@ const vitestWorkerLoader = {
   load,
   resolve,
 }
+const vitestNoWorkerInitLoader = {
+  addInstrumentations: noop,
+  load: loadWithoutInstrumentation,
+  resolve: resolveWithoutInstrumentation,
+}
+const VITEST_NO_WORKER_INIT_ACTIVE_ENV = 'DD_TEST_OPT_VITEST_NO_WORKER_INIT_ACTIVE'
 
 // For some reason `getEnvironmentVariable` is not otherwise available to ESM.
 const env = configHelper.getEnvironmentVariable
 
 function getVitestWorkerLoader () {
-  if (env('DD_VITEST_WORKER')) {
-    return vitestWorkerLoader
+  if (!isVitestWorker()) return
+  if (isMainThread && isVitestNoWorkerInitEnabled()) {
+    return vitestNoWorkerInitLoader
   }
+  return vitestWorkerLoader
+}
+
+function isVitestWorker () {
+  return env('DD_VITEST_WORKER')
+}
+
+function isVitestNoWorkerInitEnabled () {
+  // eslint-disable-next-line eslint-rules/eslint-process-env
+  const value = process.env[VITEST_NO_WORKER_INIT_ACTIVE_ENV]
+  return value === 'true' || value === '1'
+}
+
+function noop () {}
+
+function loadWithoutInstrumentation (url, context, nextLoad) {
+  return nextLoad(url, context)
+}
+
+function resolveWithoutInstrumentation (specifier, context, nextResolve) {
+  return nextResolve(specifier, context)
 }
 
 function addInstrumentations (data) {
